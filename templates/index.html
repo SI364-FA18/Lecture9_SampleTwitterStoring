@@ -1,3 +1,11 @@
+{% block login %}
+{% if current_user.is_authenticated %}
+    <a href="{{ url_for('logout') }}">Sign Out {{current_user.username}}</a>
+{% else %}
+    <a href="{{ url_for('login') }}">Sign In</a>
+{% endif %}
+{% endblock %}
+
 <div class="page-header">
     <h1>{% if num_tweets %}{{ num_tweets }}{% else %}0{% endif %} possible tweets saved. </h1>
     <p><a href="{{ url_for('see_all_tweets') }}">See all tweets.</a></p>
