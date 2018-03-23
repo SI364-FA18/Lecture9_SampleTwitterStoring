@@ -115,24 +115,43 @@ class Hashtag(db.Model):
 
 class TweetForm(FlaskForm):
     text = StringField('What should the tweet say?', validators= [Required()])
-    username = StringField('Who should post the tweet?', validators = [Required()])
+    #username = StringField('Who should post the tweet?', validators = [Required()])
     hashtags = StringField('What hashtags should be used?', validators=[Required()])
     submit = SubmitField('Submit')
+
+class RegistrationForm(FlaskForm):
+    email = StringField('Email:', validators=[Required(),Length(1,64),Email()])
+    username = StringField('Username:',validators=[Required(),Length(1,64),Regexp('^[A-Za-z][A-Za-z0-9_.]*$',0,'Usernames must have only letters, numbers, dots or underscores')])
+    password = PasswordField('Password:',validators=[Required(),EqualTo('password2',message="Passwords must match")])
+    password2 = PasswordField("Confirm Password:",validators=[Required()])
+    submit = SubmitField('Register User')
+
+    #Additional checking methods for the form
+    def validate_email(self,field):
+        if User.query.filter_by(email=field.data).first():
+            raise ValidationError('Email already registered.')
+
+    def validate_username(self,field):
+        if User.query.filter_by(username=field.data).first():
+            raise ValidationError('Username already taken')
+
+class LoginForm(FlaskForm):
+    email = StringField('Email', validators=[Required(), Length(1,64), Email()])
+    password = PasswordField('Password', validators=[Required()])
+    remember_me = BooleanField('Keep me logged in')
+    submit = SubmitField('Log In')
 
 
 ##### Helper functions
 ### For database additions / get_or_create functions
 # (Some of this code written by Julia Locke. Thanks, Julia!)
 
-def get_or_create_tweet(db_session, tweet_text, username, hashtag_list=[]):
-    user = get_or_create_user(db_session, username)
-    tweet = Tweet.query.filter_by(text=tweet_text, user_id=user.id).first()
+def get_or_create_tweet(db_session, tweet_text, hashtag_list=[]):
+    tweet = Tweet.query.filter_by(text=tweet_text, user_id=current_user.id).first()
     if tweet:
         return tweet
     else:
-        tweet = Tweet(text=tweet_text)
-        user = get_or_create_user(db_session, username)
-        tweet.user_id = user.id
+        tweet = Tweet(text=tweet_text,user_id=current_user.id)
         for ht in hashtag_list:
             hashtag = get_or_create_hashtag(db_session, ht)
             tweet.hashtags.append(hashtag)
@@ -140,15 +159,7 @@ def get_or_create_tweet(db_session, tweet_text, username, hashtag_list=[]):
         db_session.commit()
         return tweet
 
-def get_or_create_user(db_session, username):
-    user = db_session.query(User).filter_by(twitter_username=username).first()
-    if user:
-        return user
-    else:
-        user = User(twitter_username=username)
-        db_session.add(user)
-        db_session.commit()
-        return user
+# get_or_create_user not necessary, because that's handled in registration!
 
 def get_or_create_hashtag(db_session, ht):
     hashtag = db_session.query(Hashtag).filter_by(text=ht).first()
@@ -180,22 +191,19 @@ def index():
     num_tweets = len(tweets)
     form = TweetForm()
     if request.method == 'POST' and form.validate_on_submit():
-        username = form.username.data
-        user = get_or_create_user(db.session, username)
-        if db.session.query(Tweet).filter_by(user_id=user.id, text=form.text.data).first():
+        if db.session.query(Tweet).filter_by(user_id=current_user.id, text=form.text.data).first():
             flash("You've already saved a tweet with this text by this user!")
         hl = [x.strip().rstrip() for x in (form.hashtags.data).split(',')]
-        get_or_create_tweet(db.session, form.text.data, username=form.username.data, hashtag_list=hl)
+        get_or_create_tweet(db.session, form.text.data, hashtag_list=hl)
         return redirect(url_for('see_all_tweets'))
     return render_template('index.html', form=form, num_tweets=num_tweets)
 
 @app.route('/all_tweets')
 def see_all_tweets():
     all_tweets = []
-    tweets = Tweet.query.all()
+    tweets = Tweet.query.filter_by(user_id=current_user.id).all()
     for t in tweets:
-        user = User.query.filter_by(id = t.user_id).first()
-        all_tweets.append((t.text, t.hashtags, user.twitter_username)) # You could also handle this by using the objects themselves in the template, but this way works as well!
+        all_tweets.append((t.text, t.hashtags)) # You could also handle this by using the objects themselves in the template, but this way works as well!
     return render_template('all_tweets.html', all_tweets=all_tweets)
 
 @app.route('/all_users')
@@ -203,7 +211,7 @@ def see_all_users():
     users = User.query.all()
     people = []
     for u in users:
-        people.append((u.twitter_username, len(Tweet.query.filter_by(user_id=u.id).all())))
+        people.append((u.username, len(Tweet.query.filter_by(user_id=u.id).all())))
     return render_template('all_users.html', usernames=people)
 
 if __name__ == '__main__':
