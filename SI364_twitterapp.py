@@ -6,10 +6,15 @@ import os
 from flask import Flask, render_template, session, redirect, url_for, flash, request
 from flask_script import Manager, Shell
 from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField
-from wtforms.validators import Required
+from wtforms import StringField, SubmitField, FileField, PasswordField, BooleanField, SelectMultipleField, ValidationError
+from wtforms.validators import Required, Length, Email, Regexp, EqualTo
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate, MigrateCommand
+
+# Imports for login management
+from flask_login import LoginManager, login_required, logout_user, login_user, UserMixin, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 # Configure base directory of app
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -34,6 +39,13 @@ migrate = Migrate(app, db)
 # Add function use to manager
 manager.add_command("shell", Shell(make_context=make_shell_context))
 manager.add_command('db', MigrateCommand)
+
+# Login configurations setup
+login_manager = LoginManager()
+login_manager.session_protection = 'strong'
+login_manager.login_view = 'login'
+login_manager.init_app(app) # set up login manager
+
 
 #########
 ######### Everything above this line is important/useful setup, not problem-solving.
@@ -60,18 +72,31 @@ class Tweet(db.Model):
 ## -- text (String, up to 285 chars)
 ## -- user_id (Integer, ID of user posted)
 
-# User model
-class User(db.Model):
+# Special model for users to log in
+class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
-    twitter_username = db.Column(db.String(64), unique=True)
-    tweets = db.relationship('Tweet', backref='User')
+    username = db.Column(db.String(255), unique=True, index=True)
+    email = db.Column(db.String(64), unique=True, index=True)
+    password_hash = db.Column(db.String(128))
+    tweets = db.relationship('tweets',backref='User')
 
-    def __repr__(self):
-        return "{} (ID: {})".format(self.twitter_username, self.id)
-# - User
-## -- id (Primary Key)
-## -- twitter_username (String, up to 64 chars) (Unique=True)
+    @property
+    def password(self):
+        raise AttributeError('password is not a readable attribute')
+
+    @password.setter
+    def password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def verify_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+## DB load function
+## Necessary for behind the scenes login manager that comes with flask_login capabilities! Won't run without this.
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id)) # returns User object or None
 
 # Hashtag model
 class Hashtag(db.Model):
