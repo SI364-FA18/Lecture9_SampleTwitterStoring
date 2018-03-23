@@ -199,6 +199,7 @@ def index():
     return render_template('index.html', form=form, num_tweets=num_tweets)
 
 @app.route('/all_tweets')
+@login_required
 def see_all_tweets():
     all_tweets = []
     tweets = Tweet.query.filter_by(user_id=current_user.id).all()
