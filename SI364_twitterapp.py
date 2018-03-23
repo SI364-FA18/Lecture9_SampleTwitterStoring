@@ -226,6 +226,11 @@ def secret():
 def index():
     tweets = Tweet.query.all()
     num_tweets = len(tweets)
+    return render_template('index.html', num_tweets=num_tweets)
+
+@app.route('/possible_tweet',methods=['GET','POST'])
+@login_required
+def post_possible_tweet():
     form = TweetForm()
     if request.method == 'POST' and form.validate_on_submit():
         if db.session.query(Tweet).filter_by(user_id=current_user.id, text=form.text.data).first():
@@ -233,7 +238,7 @@ def index():
         hl = [x.strip().rstrip() for x in (form.hashtags.data).split(',')]
         get_or_create_tweet(db.session, form.text.data, hashtag_list=hl)
         return redirect(url_for('see_all_tweets'))
-    return render_template('index.html', form=form, num_tweets=num_tweets)
+    return render_template('possible_tweet.html', form=form)
 
 @app.route('/all_tweets')
 @login_required
