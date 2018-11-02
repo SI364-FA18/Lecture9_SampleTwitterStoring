@@ -27,12 +27,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 manager = Manager(app)
 db = SQLAlchemy(app) # For database use
 
-## Set up Shell context so it's easy to use the shell to debug
-def make_shell_context():
-    return dict(app=app, db=db, Tweet=Tweet, User=User, Hashtag=Hashtag) ## Adding your models to this shell context function so you can use them in the shell
 migrate = Migrate(app, db)
-# Add function use to manager
-manager.add_command("shell", Shell(make_context=make_shell_context))
 manager.add_command('db', MigrateCommand)
 
 #########
